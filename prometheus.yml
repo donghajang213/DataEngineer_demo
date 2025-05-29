@@ -1,0 +1,16 @@
+# infra-demo/prometheus.yml
+
+global:
+  scrape_interval: 15s     # 15초마다 메트릭 수집
+
+scrape_configs:
+  - job_name: 'app'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['app:3000']
+
+  # (옵션) 추후 nginx exporter를 추가하시면 아래처럼 스크랩할 수 있습니다.
+  # - job_name: 'nginx'
+  #   metrics_path: /metrics
+  #   static_configs:
+  #     - targets: ['nginx-exporter:9113']
