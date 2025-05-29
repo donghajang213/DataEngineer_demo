@@ -11,7 +11,8 @@ A Docker Compose-based infrastructure demo including:
 ## Prerequisites
 
 * Docker & Docker Compose installed
-* Node.js & npm (for `kafka-demo`)
+* Node.js & npm (for `kafka-demo` and AI export scripts)
+* Python & TensorFlow (for exporting models)
 * Git
 
 ## Project Structure
@@ -26,8 +27,10 @@ infra-demo/
 │   ├── producer.js
 │   ├── consumer.js
 │   └── package.json
-├── models/            # (for Phase 4)
-│   └── models.config
+├── models/
+│   ├── export_mnist.py   # script to generate and export TF SavedModel
+│   └── mnist/
+│       └── 1/            # versioned SavedModel directory
 ├── nginx/
 │   └── default.conf
 ├── prometheus.yml
@@ -48,7 +51,7 @@ infra-demo/
    git push -u origin main
    ```
 
-2. **Build and run services**
+2. **Build and run infrastructure services**
 
    ```bash
    docker-compose build --no-cache app
@@ -67,8 +70,8 @@ infra-demo/
 
 5. **Grafana**
 
-   * Add data source: URL `http://prometheus:9090`
-   * Import dashboard ID `1860`
+   * Add Prometheus data source: URL `http://prometheus:9090`
+   * Import community dashboard ID `1860`
 
 6. **Kafka setup**
 
@@ -93,14 +96,57 @@ infra-demo/
    cd kafka-demo
    npm install
    npm run consume  # keep running
-   npm run produce  # sends one message
+   npm run produce  # send one message
    ```
 
-## Next Steps (Phase 4)
+## Phase 4: AI Model Serving & Verification
 
-* Prepare TensorFlow models under `models/`
-* Add `tf-serving` service to `docker-compose.yml`
-* Test `http://localhost:8501/v1/models/<model>`
+1. **Generate and export TensorFlow SavedModel**
+
+   ```bash
+   # (Requires Python & TensorFlow installed)
+   python models/export_mnist.py
+   ```
+
+   * Exports model to `models/mnist/1` with proper signature.
+
+2. **Add TF-Serving to Compose**
+
+   ```yaml
+   services:
+     tf-serving:
+       image: tensorflow/serving:latest
+       volumes:
+         - ./models:/models:ro
+       ports:
+         - "8501:8501"
+       command: >
+         --rest_api_port=8501
+         --model_name=mnist
+         --model_base_path=/models/mnist
+   ```
+
+3. **Start TF-Serving**
+
+   ```bash
+   docker-compose up -d tf-serving
+   docker-compose logs tf-serving --tail 15
+   ```
+
+4. **Verify model availability**
+
+   ```bash
+   curl http://localhost:8501/v1/models/mnist
+   # Expect: AVAILABLE state
+   ```
+
+5. **Test prediction endpoint**
+
+   ```bash
+   python -c "import requests; data={'instances':[[0.0]*784]}; print(requests.post('http://localhost:8501/v1/models/mnist:predict', json=data).json())"
+   # Expect: {'predictions': [[...10 values...]]}
+   ```
 
 ---
 
+*Commit this updated README before proceeding to Phase 5.*
