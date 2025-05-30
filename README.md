@@ -36,17 +36,7 @@ infra-demo/
 ├── nginx/
 │   └── default.conf
 ├── prometheus.yml
-├── prometheus-rules.yml # Phase 6 alert rules
-├── alertmanager.yml     # Phase 6 Alertmanager config
 ├── docker-compose.yml
-├── public/
-│   ├── index.html          # FCM client test page (Phase 5)
-│   └── firebase-messaging-sw.js # Service worker for FCM
-├── src/
-│   ├── index.js
-│   ├── fcmService.js
-│   ├── routes/notifications.js
-│   └── firebase.js         # FCM client module
 └── README.md
 ```
 
@@ -57,9 +47,9 @@ infra-demo/
    ```bash
    git init
    git add .
-   git commit -m "chore: 초기 인프라 구성(nginx, app, db, monitoring, kafka, tf-serving)"
+   git commit -m "chore: 초기 인프라 구성(nginx, app, db, monitoring, kafka)"
    git branch -M main
-   git remote add origin <REPO_URL>
+   git remote add origin <YOUR_REMOTE_URL>
    git push -u origin main
    ```
 
@@ -70,15 +60,53 @@ infra-demo/
    docker-compose up -d
    ```
 
-... (previous steps omitted for brevity) ...
+3. **Verify containers**
 
----
+   ```bash
+   docker-compose ps
+   ```
+
+4. **Prometheus targets**
+
+   * Open: [http://localhost:9090/targets](http://localhost:9090/targets)
+
+5. **Grafana**
+
+   * Add Prometheus data source: URL `http://prometheus:9090`
+   * Import community dashboard ID `1860`
+
+6. **Kafka setup**
+
+   ```bash
+   docker-compose up -d zookeeper kafka
+   docker-compose exec kafka kafka-topics --create --topic test-topic --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
+   docker-compose exec kafka kafka-topics --list --bootstrap-server kafka:9092
+   ```
+
+7. **Kafka console test**
+
+   ```bash
+   # Producer
+   docker-compose exec kafka kafka-console-producer --broker-list kafka:9092 --topic test-topic
+   # Consumer
+   docker-compose exec kafka kafka-console-consumer --bootstrap-server kafka:9092 --topic test-topic --from-beginning
+   ```
+
+8. **Node.js producer/consumer**
+
+   ```bash
+   cd kafka-demo
+   npm install
+   npm run consume  # keep running
+   npm run produce  # send one message
+   ```
 
 ## Phase 4: AI Model Serving & Verification
 
 1. **Generate and export TensorFlow SavedModel**
 
    ```bash
+   # (Requires Python & TensorFlow installed)
    python models/export_mnist.py
    ```
 
@@ -119,15 +147,16 @@ infra-demo/
 
 ---
 
-# Phase 5: Firebase Cloud Messaging (FCM) Setup
+## Phase 5: Firebase Cloud Messaging (FCM) Setup
 
 1. **Firebase 서비스 계정 키 생성**
 
-   * Firebase 콘솔에서 프로젝트 생성 후, 서비스 계정 → 비공개 키(JSON) 다운로드 (`app/firebase-service-account.json`)
+   * Firebase 콘솔에서 프로젝트를 선택한 후, **서비스 계정(Service Accounts) → 비공개 키 생성**을 클릭해 JSON 파일을 다운로드합니다.
+   * 다운로드한 파일을 `app/firebase-service-account.json` 위치에 저장합니다.
 
-2. **환경변수 설정**
+2. **환경 변수 설정**
 
-   * `.env`에 아래 추가:
+   * 프로젝트 루트의 `.env` 파일에 아래 두 줄을 추가합니다:
 
      ```dotenv
      FCM_SERVICE_ACCOUNT=./app/firebase-service-account.json
@@ -136,11 +165,12 @@ infra-demo/
 
 3. **Docker Compose 설정**
 
-   * `docker-compose.yml` `app` 서비스에 볼륨 및 환경변수 추가:
+   * `docker-compose.yml`의 `app` 서비스 블록에 다음을 추가하세요:
 
      ```yaml
      services:
        app:
+         # …
          volumes:
            - ./app/firebase-service-account.json:/app/firebase-service-account.json:ro
          environment:
@@ -150,15 +180,15 @@ infra-demo/
 
 4. **서버 코드 구성**
 
-   * `src/fcmService.js`에 Admin SDK 초기화 및 `sendPushToTopic()`, `sendPush()` 구현
-   * `src/routes/notifications.js`에 `/api/notify` 엔드포인트 구현
-   * `src/index.js`에 라우터 등록 및 `send-test-notification` 경로 추가
+   * **`src/fcmService.js`**: Firebase Admin SDK 초기화 및 `sendPushToTopic()`, `sendPush()` 함수 구현
+   * **`src/routes/notifications.js`**: `/api/notify` 엔드포인트 구현
+   * **`src/index.js`**: 라우터 등록 및 `/send-test-notification` 경로 추가
 
 5. **클라이언트 FCM 모듈 작성**
 
-   * `src/firebase.js`에 Firebase JS SDK 초기화, `requestFcmToken(vapidKey)`, `onFcmMessage()` 구현
-   * `public/index.html` 테스트 페이지 생성, SW 등록 및 토큰 발급 후 백엔드 전송 코드 삽입
-   * `public/firebase-messaging-sw.js` 서비스 워커 파일 추가
+   * **`src/firebase.js`**: Firebase JS SDK 초기화, `requestFcmToken(vapidKey)`, `onFcmMessage()` 함수 구현
+   * **`public/index.html`**: 테스트 페이지 생성 (SW 등록, 토큰 발급 후 백엔드 전송 스크립트 포함)
+   * **`public/firebase-messaging-sw.js`**: 서비스 워커 파일 추가
 
 6. **빌드 및 실행**
 
@@ -169,9 +199,17 @@ infra-demo/
 
 7. **검증**
 
-   * 클라이언트(브라우저)에서 `index.html` 오픈 → 토큰 발급 확인
-   * `curl /send-test-notification` 으로 토픽 기반 푸시 테스트
-   * `curl /api/notify` 으로 토큰 기반 멀티캐스트 테스트
+   * **클라이언트(브라우저)**: `http://localhost:3000/index.html` 오픈 → 콘솔에 `✅ FCM 등록 토큰:` 로그 확인
+   * **토픽 기반 푸시**:
+
+     ```bash
+     curl -X POST http://localhost:3000/send-test-notification -H "Content-Type: application/json" -d "{}"
+     ```
+   * **멀티캐스트 푸시**:
+
+     ```bash
+     curl -X POST http://localhost:3000/api/notify -H "Content-Type: application/json" -d '{"tokens":["<YOUR_TOKEN>"],"title":"테스트","body":"메시지입니다"}'
+     ```
 
 ---
 
