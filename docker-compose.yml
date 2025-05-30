@@ -17,8 +17,11 @@ services:
     image: infra-demo_app:latest
     ports:
       - "3000:3000"
-    environment:
+    volumes:
+      - ./app/firebase-service-account.json:/app/firebase-service-account.json:ro
+    environment:                # environment 블록을 한 번만 정의합니다
       - NODE_ENV=production
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json
     labels:
       - "prometheus.enable=true"
       - "prometheus.port=3000"

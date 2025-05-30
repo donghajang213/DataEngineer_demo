@@ -149,4 +149,58 @@ infra-demo/
 
 ---
 
-*Commit this updated README before proceeding to Phase 5.*
+##Phase 5: Firebase Cloud Messaging (FCM) Setup
+
+Firebase 서비스 계정 키 생성
+
+Firebase 콘솔에서 프로젝트 생성 후, 서비스 계정 → 비공개 키(JSON) 다운로드 (app/firebase-service-account.json)
+
+환경변수 설정
+
+.env에 아래 추가:
+
+FCM_SERVICE_ACCOUNT=./app/firebase-service-account.json
+FCM_TOPIC=infra-demo-topic
+
+Docker Compose 설정
+
+docker-compose.yml app 서비스에 볼륨 및 환경변수 추가:
+
+services:
+  app:
+    volumes:
+      - ./app/firebase-service-account.json:/app/firebase-service-account.json:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json
+      - FCM_TOPIC=${FCM_TOPIC}
+
+서버 코드 구성
+
+src/fcmService.js에 Admin SDK 초기화 및 sendPushToTopic(), sendPush() 구현
+
+src/routes/notifications.js에 /api/notify 엔드포인트 구현
+
+src/index.js에 라우터 등록 및 send-test-notification 경로 추가
+
+클라이언트 FCM 모듈 작성
+
+src/firebase.js에 Firebase JS SDK 초기화, requestFcmToken(vapidKey), onFcmMessage() 구현
+
+public/index.html 테스트 페이지 생성, SW 등록 및 토큰 발급 후 백엔드 전송 코드 삽입
+
+public/firebase-messaging-sw.js 서비스 워커 파일 추가
+
+빌드 및 실행
+
+docker-compose down
+docker-compose up -d --build
+
+검증
+
+클라이언트(브라우저)에서 index.html 오픈 → 토큰 발급 확인
+
+curl /send-test-notification 으로 토픽 기반 푸시 테스트
+
+curl /api/notify 으로 토큰 기반 멀티캐스트 테스트
+
+Commit this updated README before proceeding to Phase 6.

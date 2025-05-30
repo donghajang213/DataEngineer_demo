@@ -7,8 +7,9 @@ FROM node:18-alpine
 WORKDIR /usr/src/app
 
 # 3) package.json 복사 후 의존성 설치
-COPY package*.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+
+RUN npm install --production
 
 # 4) 앱 소스 복사
 COPY . .

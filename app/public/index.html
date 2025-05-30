@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Infra-Demo FCM Test</title>
+  <script type="module">
+    console.log('🟢 script loaded');
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging.js";
+
+    const firebaseConfig = { /* ...your config... */ };
+    const PUBLIC_VAPID_KEY = "BPQTljeOPuraI-aAAJAtyYXrjQ1ktiUez_HauP_WozOInBWSzb9VaF5-CaFgaPRUaGFWtRlnfXrZU65UqBtvZ_M";
+
+    console.log('🟢 initializing Firebase app');
+    const app = initializeApp(firebaseConfig);
+    const messaging = getMessaging(app);
+
+    async function initFcm() {
+      console.log('🟢 initFcm start');
+      try {
+        console.log('🟢 registering service worker');
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        console.log('🟢 SW registered:', registration);
+
+        console.log('🟢 requesting notification permission');
+        const permission = await Notification.requestPermission();
+        console.log('🟢 permission:', permission);
+        if (permission !== 'granted') throw new Error('권한 거부됨');
+
+        console.log('🟢 calling getToken()');
+        const token = await getToken(messaging, {
+          vapidKey: PUBLIC_VAPID_KEY,
+          serviceWorkerRegistration: registration
+        });
+        console.log('✅ FCM 등록 토큰:', token);
+
+        onMessage(messaging, payload => {
+          console.log('📩 포그라운드 메시지:', payload);
+          alert(`${payload.notification.title}\n${payload.notification.body}`);
+        });
+      } catch (err) {
+        console.error('⚠️ initFcm error:', err);
+      }
+    }
+
+    window.addEventListener('load', () => {
+      console.log('🟢 window loaded');
+      initFcm();
+    });
+  </script>
+</head>
+<body>
+  <h1>Infra-Demo FCM Client Test</h1>
+  <p>콘솔 로그를 확인하세요.</p>
+</body>
+</html>
